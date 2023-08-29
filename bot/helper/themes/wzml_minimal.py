@@ -6,7 +6,7 @@ class WZMLStyle:
     ST_BN1_URL = 'https://t.me/ShoGuNPacKs'
     ST_BN2_NAME = '🛠️ Helper'
     ST_BN2_URL = 'https://t.me/KingOfFondness'
-    ST_MSG = '''<i>✨ This bot can mirror all your links|files|torrents to GD|RCL|telegram|ddl servers.</i>
+    ST_MSG = '''<i>This bot can mirror all your links|files|torrents to Google Drive or any rclone cloud or to telegram or to ddl servers.</i>
 <b>Type {help_command} to get a list of available commands</b>'''
     ST_BOTPM = '''<i>🕵️ Bot PM Initiated Successfully!\n\nℹ️ I will send all your files and links here.</i>'''
     ST_UNAUTH = '''<i>⚠️ You Are not authorized user! Get Auth from Modi</i>'''
