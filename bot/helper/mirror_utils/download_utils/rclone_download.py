@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 from asyncio import gather
 from json import loads
-from random import SystemRandom
-from string import ascii_letters, digits
+from secrets import token_hex
 
-from bot import bot_cache, download_dict, download_dict_lock, queue_dict_lock, non_queued_dl, LOGGER
+from bot import download_dict, download_dict_lock, queue_dict_lock, non_queued_dl, LOGGER
 from bot.helper.ext_utils.bot_utils import cmd_exec
 from bot.helper.telegram_helper.message_utils import sendMessage, sendStatusMessage
 from bot.helper.ext_utils.task_manager import is_queued, stop_duplicate_check
@@ -17,9 +16,9 @@ async def add_rclone_download(rc_path, config_path, path, name, listener):
     remote, rc_path = rc_path.split(':', 1)
     rc_path = rc_path.strip('/')
 
-    cmd1 = [bot_cache['pkgs'][3], 'lsjson', '--fast-list', '--stat', '--no-mimetype',
+    cmd1 = ['rclone', 'lsjson', '--fast-list', '--stat', '--no-mimetype',
             '--no-modtime', '--config', config_path, f'{remote}:{rc_path}']
-    cmd2 = [bot_cache['pkgs'][3], 'size', '--fast-list', '--json',
+    cmd2 = ['rclone', 'size', '--fast-list', '--json',
             '--config', config_path, f'{remote}:{rc_path}']
     res1, res2 = await gather(cmd_exec(cmd1), cmd_exec(cmd2))
     if res1[2] != res2[2] != 0:
@@ -41,8 +40,7 @@ async def add_rclone_download(rc_path, config_path, path, name, listener):
     else:
         name = rc_path.rsplit('/', 1)[-1]
     size = rsize['bytes']
-    gid = ''.join(SystemRandom().choices(ascii_letters + digits, k=12))
-
+    gid = token_hex(5)
     msg, button = await stop_duplicate_check(name, listener)
     if msg:
         await sendMessage(listener.message, msg, button)
