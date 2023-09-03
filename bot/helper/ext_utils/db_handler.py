@@ -42,7 +42,7 @@ class DbManger:
                 uid = row['_id']
                 del row['_id']
                 thumb_path = f'Thumbnails/{uid}.jpg'
-                rclone_path = f'wcl/{uid}.conf'
+                rclone_path = f'rclone/{uid}.conf'
                 if row.get('thumb'):
                     if not await aiopath.exists('Thumbnails'):
                         await makedirs('Thumbnails')
@@ -50,8 +50,8 @@ class DbManger:
                         await f.write(row['thumb'])
                     row['thumb'] = thumb_path
                 if row.get('rclone'):
-                    if not await aiopath.exists('wcl'):
-                        await makedirs('wcl')
+                    if not await aiopath.exists('rclone'):
+                        await makedirs('rclone')
                     async with aiopen(rclone_path, 'wb+') as f:
                         await f.write(row['rclone'])
                     row['rclone'] = rclone_path
@@ -169,10 +169,10 @@ class DbManger:
         await self.__db.rss[bot_id].delete_one({'_id': user_id})
         self.__conn.close
 
-    async def add_incomplete_task(self, cid, link, tag):
+    async def add_incomplete_task(self, cid, link, tag, msg_link):
         if self.__err:
             return
-        await self.__db.tasks[bot_id].insert_one({'_id': link, 'cid': cid, 'tag': tag})
+        await self.__db.tasks[bot_id].insert_one({'_id': link, 'cid': cid, 'tag': tag, 'source': msg_link})
         self.__conn.close
 
     async def rm_complete_task(self, link):
@@ -186,27 +186,25 @@ class DbManger:
         if self.__err:
             return notifier_dict
         if await self.__db.tasks[bot_id].find_one():
-            # return a dict ==> {_id, cid, tag}
+            # return a dict ==> {_id, cid, tag, source}
             rows = self.__db.tasks[bot_id].find({})
             async for row in rows:
                 if row['cid'] in list(notifier_dict.keys()):
                     if row['tag'] in list(notifier_dict[row['cid']]):
-                        notifier_dict[row['cid']][row['tag']].append(
-                            row['_id'])
+                        notifier_dict[row['cid']][row['tag']].append({row['_id']: row['source']})
                     else:
-                        notifier_dict[row['cid']][row['tag']] = [row['_id']]
+                        notifier_dict[row['cid']][row['tag']] = [{row['_id']: row['source']}]
                 else:
-                    notifier_dict[row['cid']] = {row['tag']: [row['_id']]}
+                    notifier_dict[row['cid']] = {row['tag']: [{row['_id']: row['source']}]}
         await self.__db.tasks[bot_id].drop()
         self.__conn.close
-        return notifier_dict  # return a dict ==> {cid: {tag: [_id, _id, ...]}}
+        return notifier_dict  # return a dict ==> {cid: {tag: [{_id: source}, {_id, source}, ...]}}
 
     async def trunc_table(self, name):
         if self.__err:
             return
         await self.__db[name][bot_id].drop()
         self.__conn.close
-
 
 if DATABASE_URL:
     bot_loop.run_until_complete(DbManger().db_load())
