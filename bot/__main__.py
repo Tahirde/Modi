@@ -2,9 +2,10 @@ from time import time, monotonic
 from datetime import datetime
 from sys import executable
 from os import execl as osexecl
-from asyncio import create_subprocess_exec, gather
+from asyncio import create_subprocess_exec, gather, run as asyrun
 from uuid import uuid4
 from base64 import b64decode
+from importlib import import_module, reload
 
 from requests import get as rget
 from pytz import timezone
@@ -12,11 +13,12 @@ from bs4 import BeautifulSoup
 from signal import signal, SIGINT
 from aiofiles.os import path as aiopath, remove as aioremove
 from aiofiles import open as aiopen
+from pyrogram import idle
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, private, regex
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot import bot, bot_cache, bot_name, config_dict, user_data, botStartTime, LOGGER, Interval, DATABASE_URL, QbInterval, INCOMPLETE_TASK_NOTIFIER, scheduler
+from bot import bot, user, bot_name, config_dict, user_data, botStartTime, LOGGER, Interval, DATABASE_URL, QbInterval, INCOMPLETE_TASK_NOTIFIER, scheduler
 from bot.version import get_version
 from .helper.ext_utils.fs_utils import start_cleanup, clean_all, exit_clean_up
 from .helper.ext_utils.bot_utils import get_readable_time, cmd_exec, sync_to_async, new_task, set_commands, update_user_ldata, get_stats
@@ -62,11 +64,11 @@ async def start(client, message):
         return await sendMessage(message, msg, reply_markup)
     elif await CustomFilters.authorized(client, message):
         start_string = BotTheme('ST_MSG', help_command=f"/{BotCommands.HelpCommand}")
-        await sendMessage(message, start_string, reply_markup, photo=BotTheme('PIC'))
+        await sendMessage(message, start_string, reply_markup, photo='IMAGES')
     elif config_dict['BOT_PM']:
-        await sendMessage(message, BotTheme('ST_BOTPM'), reply_markup, photo=BotTheme('PIC'))
+        await sendMessage(message, BotTheme('ST_BOTPM'), reply_markup, photo='IMAGES')
     else:
-        await sendMessage(message, BotTheme('ST_UNAUTH'), reply_markup, photo=BotTheme('PIC'))
+        await sendMessage(message, BotTheme('ST_UNAUTH'), reply_markup, photo='IMAGES')
     await DbManger().update_pm_users(message.from_user.id)
 
 
@@ -110,7 +112,7 @@ async def restart(client, message):
         if interval:
             interval[0].cancel()
     await sync_to_async(clean_all)
-    proc1 = await create_subprocess_exec('pkill', '-9', '-f', f'gunicorn|{bot_cache["pkgs"][-1]}')
+    proc1 = await create_subprocess_exec('pkill', '-9', '-f', 'gunicorn|aria2c|qbittorrent-nox|ffmpeg|rclone')
     proc2 = await create_subprocess_exec('python3', 'update.py')
     await gather(proc1.wait(), proc2.wait())
     async with aiopen(".restartmsg", "w") as f:
@@ -128,7 +130,7 @@ async def ping(_, message):
 async def log(_, message):
     buttons = ButtonMaker()
     buttons.ibutton('📑 Log Display', f'wzmlx {message.from_user.id} logdisplay')
-    buttons.ibutton('📨 Web Paste', f'wzmlx {message.from_user.id} webpaste')
+    buttons.ibutton('📨 Web Paste (SB)', f'wzmlx {message.from_user.id} webpaste')
     await sendFile(message, 'log.txt', buttons=buttons.build_menu(1))
 
 
@@ -193,9 +195,10 @@ async def restart_notification():
                 msg = BotTheme('RESTART_SUCCESS', time=now.strftime('%I:%M:%S %p'), date=now.strftime('%d/%m/%y'), timz=config_dict['TIMEZONE'], version=get_version()) if cid == chat_id else BotTheme('RESTARTED')
                 msg += "\n\n⌬ <b><i>Incomplete Tasks!</i></b>"
                 for tag, links in data.items():
-                    msg += f"\n➲ {tag}: "
+                    msg += f"\n➲ <b>User:</b> {tag}\n┖ <b>Tasks:</b>"
                     for index, link in enumerate(links, start=1):
-                        msg += f" <a href='{link}'>{index}</a> |"
+                        msg_link, source = next(iter(link.items()))
+                        msg += f" {index}. <a href='{source}'>S</a> ->  <a href='{msg_link}'>L</a> |"
                         if len(msg.encode()) > 4000:
                             await send_incompelete_task_message(cid, msg)
                             msg = ''
@@ -231,7 +234,18 @@ async def main():
     bot.add_handler(MessageHandler(stats, filters=command(
         BotCommands.StatsCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
+    if user:
+        LOGGER.info(f"WZ's User [@{user.me.first_name}] Ready!")
     signal(SIGINT, exit_clean_up)
 
-bot.loop.run_until_complete(main())
-bot.loop.run_forever()
+async def stop_signals():
+    if user:
+        await gather(bot.stop(), user.stop())
+    else:
+        await bot.stop()
+
+
+bot_run = bot.loop.run_until_complete
+bot_run(main())
+bot_run(idle())
+bot_run(stop_signals())
