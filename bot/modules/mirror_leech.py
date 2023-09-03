@@ -3,13 +3,13 @@ from pyrogram.filters import command, regex
 from html import escape
 from base64 import b64encode
 from re import match as re_match
-from urllib.parse import unquote
 from asyncio import sleep
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
 from cloudscraper import create_scraper
 
 from bot import bot, DOWNLOAD_DIR, LOGGER, config_dict, bot_name, categories_dict, user_data
+from bot.helper.mirror_utils.download_utils.direct_downloader import add_direct_download
 from bot.helper.ext_utils.bot_utils import is_url, is_magnet, is_mega_link, is_gdrive_link, get_content_type, new_task, sync_to_async, is_rclone_path, is_telegram_link, arg_parser, fetch_user_tds, fetch_user_dumps, get_stats
 from bot.helper.ext_utils.exceptions import DirectDownloadLinkException
 from bot.helper.ext_utils.task_manager import task_utils
@@ -224,9 +224,9 @@ async def _mirror_leech(client, message, isQbit=False, isLeech=False, sameDir=No
         await delete_links(message)
         return
 
-    org_link, headers, multiAria = None, '', []
+    org_link = None
     if link:
-        LOGGER.info(f"Link: {link}")
+        LOGGER.info(link)
         org_link = link
 
     if not is_mega_link(link) and not isQbit and not is_magnet(link) and not is_rclone_path(link) \
@@ -236,15 +236,8 @@ async def _mirror_leech(client, message, isQbit=False, isLeech=False, sameDir=No
             process_msg = await sendMessage(message, f"<i><b>Processing:</b></i> <code>{link}</code>")
             try:
                 link = await sync_to_async(direct_link_generator, link)
-                if isinstance(link, list):
-                    link, headers = link
-                    if isinstance(link, dict):
-                        multiAria = [link, headers, unquote(org_link.rstrip('/').rsplit('/', 1)[1])]
-                        link = list(multiAria[0].keys())[0]
-                        if (folder_name := multiAria[0][link]):
-                            path += "/" + folder_name
-                        multiAria[0].pop(link)
-                LOGGER.info(f"Generated link: {link}")
+                if not isinstance(link, dict):
+                    LOGGER.info(f"Generated link: {link}")
                 await editMessage(process_msg, f"<i><b>Generated link:</b></i> <code>{link}</code>")
             except DirectDownloadLinkException as e:
                 LOGGER.info(str(e))
@@ -327,12 +320,13 @@ async def _mirror_leech(client, message, isQbit=False, isLeech=False, sameDir=No
             return
 
     listener = MirrorLeechListener(message, compress, extract, isQbit, isLeech, tag, select, seed, 
-                                    sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, 
-                                    source_url=org_link if org_link else link, multiAria=multiAria)
+                                    sameDir, rcf, up, join, drive_id=drive_id, index_link=index_link, source_url=org_link if org_link else link)
 
     if file_ is not None:
         await delete_links(message)
         await TelegramDownloadHelper(listener).add_download(reply_to, f'{path}/', name, session)
+    elif isinstance(link, dict):
+        await add_direct_download(link, path, listener, name)
     elif is_rclone_path(link):
         if link.startswith('mrcc:'):
             link = link.split('mrcc:', 1)[1]
@@ -357,8 +351,10 @@ async def _mirror_leech(client, message, isQbit=False, isLeech=False, sameDir=No
         pssw = args['-p'] or args['-pass']
         if ussr or pssw:
             auth = f"{ussr}:{pssw}"
-            headers = f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
-        await add_aria2c_download(link, path, listener, name, headers, ratio, seed_time)
+            auth = "Basic " + b64encode(auth.encode()).decode('ascii')
+        else:
+            auth = ''
+        await add_aria2c_download(link, path, listener, name, auth, ratio, seed_time)
     await delete_links(message)
 
 
