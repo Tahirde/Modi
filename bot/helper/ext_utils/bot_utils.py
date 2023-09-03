@@ -140,12 +140,12 @@ def handleIndex(index, dic):
 def get_progress_bar_string(pct):
     pct = float(str(pct).strip('%'))
     p = min(max(pct, 0), 100)
-    cFull = int(p // 7)
-    cPart = int(p % 7 - 1)
-    p_str = '⬤' * cFull
+    cFull = int(p // 8)
+    cPart = int(p % 8 - 1)
+    p_str = '■' * cFull
     if cPart >= 0:
-        p_str += ['〇', '◔', '◑', '◕', '⬤'][cPart]
-    p_str += '〇' * (12 - cFull)
+        p_str += ['▤', '▥', '▦', '▧', '▨', '▩', '■'][cPart]
+    p_str += '□' * (12 - cFull)
     return f"[{p_str}]"
 
 
@@ -167,10 +167,11 @@ def get_all_versions():
         vr = ''
     bot_cache['eng_versions'] = {'p7zip':vp, 'ffmpeg': vf, 'rclone': vr,
                                     'aria': aria2.client.get_version()['version'],
+                                    'aiohttp': get_distribution('aiohttp').version,
                                     'gapi': get_distribution('google-api-python-client').version,
                                     'mega': MegaApi('test').getVersion(),
                                     'qbit': get_client().app.version,
-                                    'pyro': get_distribution('pyrofork').version,
+                                    'pyro': get_distribution('pyrogram').version,
                                     'ytdlp': get_distribution('yt-dlp').version}
 
 
@@ -180,10 +181,11 @@ class EngineStatus:
             get_all_versions()
             version_cache = bot_cache.get('eng_versions')
         self.STATUS_ARIA = f"Aria2 v{version_cache['aria']}"
+        self.STATUS_AIOHTTP = f"AioHttp {version_cache['aiohttp']}"
         self.STATUS_GD = f"Google-API v{version_cache['gapi']}"
         self.STATUS_MEGA = f"MegaSDK v{version_cache['mega']}"
         self.STATUS_QB = f"qBit {version_cache['qbit']}"
-        self.STATUS_TG = f"PyroFork v{version_cache['pyro']}"
+        self.STATUS_TG = f"Pyrogram v{version_cache['pyro']}"
         self.STATUS_YT = f"yt-dlp v{version_cache['ytdlp']}"
         self.STATUS_EXT = "pExtract v2"
         self.STATUS_SPLIT_MERGE = f"ffmpeg v{version_cache['ffmpeg']}"
@@ -336,10 +338,6 @@ def is_telegram_link(url):
 
 def is_share_link(url):
     return bool(re_match(r'https?:\/\/.+\.gdtot\.\S+|https?:\/\/(filepress|filebee|appdrive|gdflix)\.\S+', url))
-
-
-def is_index_link(url):
-    return bool(re_match(r'https?:\/\/.+\/\d+\:\/', url))
 
 
 def is_mega_link(url):
